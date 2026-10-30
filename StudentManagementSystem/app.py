@@ -1,137 +1,118 @@
 
 
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
+from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from pathlib import Path
 
 app = Flask(__name__)
-app.secret_key = "change-this-secret-key-before-deployment"
+app.secret_key = "student-management-demo-secret-key"
 
-DATABASE = "database.db"
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "database.db"
 
-
-# ---------------- DATABASE CONNECTION ----------------
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    db = sqlite3.connect(DB_PATH)
+    db.row_factory = sqlite3.Row
+    return db
 
 
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
+    db = get_db()
+    db.executescript("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL
+    );
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
+    CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        course TEXT DEFAULT '',
+        year TEXT DEFAULT '',
+        phone TEXT DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS teachers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        subject TEXT DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        marked_by INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS exams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        marks REAL NOT NULL,
+        total REAL NOT NULL,
+        exam_date TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS fees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        status TEXT NOT NULL,
+        due_date TEXT
+    );
     """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            course TEXT,
-            year TEXT,
-            phone TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS teachers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            subject TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id INTEGER,
-            date TEXT,
-            status TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS exams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id INTEGER,
-            subject TEXT,
-            marks INTEGER,
-            total INTEGER
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS fees (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id INTEGER,
-            amount REAL,
-            status TEXT
-        )
-    """)
-
-    # Create default administrator account
-    admin = cur.execute(
+    admin = db.execute(
         "SELECT id FROM users WHERE email=?",
         ("admin@school.com",)
     ).fetchone()
 
     if not admin:
-        cur.execute("""
-            INSERT INTO users (name, email, password, role)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "Administrator",
-            "admin@school.com",
-            generate_password_hash("admin123"),
-            "admin"
-        ))
+        db.execute(
+            "INSERT INTO users(name,email,password,role) VALUES(?,?,?,?)",
+            ("Administrator", "admin@school.com",
+             generate_password_hash("admin123"), "admin")
+        )
 
-    conn.commit()
-    conn.close()
+    db.commit()
+    db.close()
 
 
-# ---------------- LOGIN PROTECTION ----------------
-
-def login_required(roles=None):
+def login_required(role=None):
     def decorator(function):
         @wraps(function)
         def wrapper(*args, **kwargs):
             if "user_id" not in session:
                 return redirect(url_for("login"))
 
-            if roles and session.get("role") not in roles:
-                flash("You are not authorized to access this page.")
+            if role and session.get("role") != role:
+                flash("You are not authorized to access that page.", "error")
                 return redirect(url_for("dashboard"))
 
             return function(*args, **kwargs)
-
         return wrapper
     return decorator
 
-
-# ---------------- HOME ----------------
 
 @app.route("/")
 def home():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
-
     return redirect(url_for("login"))
 
-
-# ---------------- REGISTRATION ----------------
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -139,80 +120,50 @@ def register():
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        role = request.form.get("role", "")
+        role = request.form.get("role", "").strip()
 
         if not name or not email or not password:
-            flash("Please complete all required fields.")
-            return redirect(url_for("register"))
-
-        if len(password) < 6:
-            flash("Password must contain at least 6 characters.")
+            flash("Please complete all fields.", "error")
             return redirect(url_for("register"))
 
         if role not in ("student", "teacher"):
-            flash("Please select a valid account type.")
+            flash("Please select a valid role.", "error")
             return redirect(url_for("register"))
 
-        conn = get_db()
+        if len(password) < 6:
+            flash("Password must contain at least 6 characters.", "error")
+            return redirect(url_for("register"))
 
+        db = get_db()
         try:
-            existing_user = conn.execute(
-                "SELECT id FROM users WHERE email=?",
-                (email,)
-            ).fetchone()
-
-            if existing_user:
-                flash("This email already has an account.")
-                return redirect(url_for("register"))
-
-            conn.execute("""
-                INSERT INTO users (name, email, password, role)
-                VALUES (?, ?, ?, ?)
-            """, (
-                name,
-                email,
-                generate_password_hash(password),
-                role
-            ))
+            cursor = db.execute(
+                "INSERT INTO users(name,email,password,role) VALUES(?,?,?,?)",
+                (name, email, generate_password_hash(password), role)
+            )
+            user_id = cursor.lastrowid
 
             if role == "student":
-                existing_student = conn.execute(
-                    "SELECT id FROM students WHERE email=?",
-                    (email,)
-                ).fetchone()
+                db.execute(
+                    "INSERT INTO students(user_id,name,email) VALUES(?,?,?)",
+                    (user_id, name, email)
+                )
+            else:
+                db.execute(
+                    "INSERT INTO teachers(user_id,name,email) VALUES(?,?,?)",
+                    (user_id, name, email)
+                )
 
-                if existing_student:
-                    conn.execute("""
-                        UPDATE students SET name=? WHERE email=?
-                    """, (name, email))
-                else:
-                    conn.execute("""
-                        INSERT INTO students (name, email)
-                        VALUES (?, ?)
-                    """, (name, email))
-
-            elif role == "teacher":
-                conn.execute("""
-                    INSERT INTO teachers (name, email)
-                    VALUES (?, ?)
-                """, (name, email))
-
-            conn.commit()
-            flash("Registration successful. Please log in.")
+            db.commit()
+            flash("Registration successful. Please log in.", "success")
+            return redirect(url_for("login"))
 
         except sqlite3.IntegrityError:
-            conn.rollback()
-            flash("Registration could not be completed. Check the email.")
-
+            flash("This email is already registered.", "error")
         finally:
-            conn.close()
-
-        return redirect(url_for("login"))
+            db.close()
 
     return render_template("register.html")
 
-
-# ---------------- LOGIN ----------------
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -220,14 +171,11 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
-        conn = get_db()
-
-        user = conn.execute(
-            "SELECT * FROM users WHERE email=?",
-            (email,)
+        db = get_db()
+        user = db.execute(
+            "SELECT * FROM users WHERE email=?", (email,)
         ).fetchone()
-
-        conn.close()
+        db.close()
 
         if user and check_password_hash(user["password"], password):
             session.clear()
@@ -235,28 +183,38 @@ def login():
             session["name"] = user["name"]
             session["email"] = user["email"]
             session["role"] = user["role"]
-
             return redirect(url_for("dashboard"))
 
-        flash("Invalid email or password.")
+        flash("Invalid email or password.", "error")
 
     return render_template("login.html")
 
 
-# ---------------- LOGOUT ----------------
-
 @app.route("/logout")
 def logout():
     session.clear()
+    flash("You have logged out successfully.", "success")
     return redirect(url_for("login"))
 
-
-# ---------------- DASHBOARD ----------------
 
 @app.route("/dashboard")
 @login_required()
 def dashboard():
     role = session["role"]
+
+    if role == "admin":
+        db = get_db()
+        stats = {
+            "students": db.execute("SELECT COUNT(*) FROM students").fetchone()[0],
+            "teachers": db.execute("SELECT COUNT(*) FROM teachers").fetchone()[0],
+            "attendance": db.execute("SELECT COUNT(*) FROM attendance").fetchone()[0],
+            "exams": db.execute("SELECT COUNT(*) FROM exams").fetchone()[0]
+        }
+        students = db.execute(
+            "SELECT * FROM students ORDER BY id DESC LIMIT 5"
+        ).fetchall()
+        db.close()
+        return render_template("dashboard.html", stats=stats, students=students)
 
     if role == "student":
         return redirect(url_for("student_portal"))
@@ -264,504 +222,350 @@ def dashboard():
     if role == "teacher":
         return redirect(url_for("teacher_portal"))
 
-    conn = get_db()
-
-    counts = {
-        "students": conn.execute(
-            "SELECT COUNT(*) FROM students"
-        ).fetchone()[0],
-
-        "teachers": conn.execute(
-            "SELECT COUNT(*) FROM teachers"
-        ).fetchone()[0],
-
-        "attendance": conn.execute(
-            "SELECT COUNT(*) FROM attendance"
-        ).fetchone()[0],
-
-        "fees": conn.execute(
-            "SELECT COUNT(*) FROM fees"
-        ).fetchone()[0]
-    }
-
-    recent_students = conn.execute("""
-        SELECT * FROM students
-        ORDER BY id DESC LIMIT 5
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "dashboard.html",
-        counts=counts,
-        students=recent_students
-    )
+    session.clear()
+    return redirect(url_for("login"))
 
 
-# ---------------- STUDENT MANAGEMENT ----------------
+# ADMIN: STUDENTS
 
-@app.route("/students")
-@login_required(["admin"])
+@app.route("/students", methods=["GET", "POST"])
+@login_required("admin")
 def students():
-    conn = get_db()
-
-    records = conn.execute("""
-        SELECT * FROM students ORDER BY id DESC
-    """).fetchall()
-
-    conn.close()
-
-    return render_template("students.html", students=records)
-
-
-@app.route("/students/add", methods=["POST"])
-@login_required(["admin"])
-def add_student():
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip().lower()
-    course = request.form.get("course", "")
-    year = request.form.get("year", "")
-    phone = request.form.get("phone", "")
-
-    if not name or not email:
-        flash("Name and email are required.")
-        return redirect(url_for("students"))
-
-    conn = get_db()
-
-    try:
-        conn.execute("""
-            INSERT INTO students (name, email, course, year, phone)
-            VALUES (?, ?, ?, ?, ?)
-        """, (name, email, course, year, phone))
-
-        conn.commit()
-        flash("Student added successfully.")
-
-    except sqlite3.IntegrityError:
-        flash("A student with this email already exists.")
-
-    finally:
-        conn.close()
-
-    return redirect(url_for("students"))
-
-
-@app.route("/students/edit/<int:student_id>", methods=["GET", "POST"])
-@login_required(["admin"])
-def edit_student(student_id):
-    conn = get_db()
-
-    student = conn.execute(
-        "SELECT * FROM students WHERE id=?",
-        (student_id,)
-    ).fetchone()
-
-    if not student:
-        conn.close()
-        flash("Student not found.")
-        return redirect(url_for("students"))
+    db = get_db()
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
-        course = request.form.get("course", "")
-        year = request.form.get("year", "")
-        phone = request.form.get("phone", "")
+        course = request.form.get("course", "").strip()
+        year = request.form.get("year", "").strip()
+        phone = request.form.get("phone", "").strip()
 
         if not name or not email:
-            flash("Name and email are required.")
-            conn.close()
-            return redirect(url_for("edit_student", student_id=student_id))
+            flash("Student name and email are required.", "error")
+        else:
+            try:
+                db.execute(
+                    """INSERT INTO students(name,email,course,year,phone)
+                    VALUES(?,?,?,?,?)""",
+                    (name, email, course, year, phone)
+                )
+                db.commit()
+                flash("Student added successfully.", "success")
+            except sqlite3.IntegrityError:
+                flash("Could not add student.", "error")
 
-        try:
-            conn.execute("""
-                UPDATE students
-                SET name=?, email=?, course=?, year=?, phone=?
-                WHERE id=?
-            """, (name, email, course, year, phone, student_id))
+    records = db.execute("SELECT * FROM students ORDER BY id DESC").fetchall()
+    db.close()
+    return render_template("students.html", students=records)
 
-            conn.execute("""
-                UPDATE users SET name=?, email=?
-                WHERE email=? AND role='student'
-            """, (name, email, student["email"]))
 
-            conn.commit()
-            flash("Student details updated successfully.")
+@app.route("/students/edit/<int:student_id>", methods=["GET", "POST"])
+@login_required("admin")
+def edit_student(student_id):
+    db = get_db()
+    student = db.execute(
+        "SELECT * FROM students WHERE id=?", (student_id,)
+    ).fetchone()
 
-        except sqlite3.IntegrityError:
-            conn.rollback()
-            flash("This email is already in use.")
-
-        finally:
-            conn.close()
-
+    if not student:
+        db.close()
+        flash("Student not found.", "error")
         return redirect(url_for("students"))
 
-    conn.close()
+    if request.method == "POST":
+        db.execute(
+            """UPDATE students SET name=?,email=?,course=?,year=?,phone=?
+            WHERE id=?""",
+            (
+                request.form.get("name", "").strip(),
+                request.form.get("email", "").strip().lower(),
+                request.form.get("course", "").strip(),
+                request.form.get("year", "").strip(),
+                request.form.get("phone", "").strip(),
+                student_id
+            )
+        )
+        db.commit()
+        db.close()
+        flash("Student updated successfully.", "success")
+        return redirect(url_for("students"))
 
+    db.close()
     return render_template("edit_student.html", student=student)
 
 
 @app.route("/students/delete/<int:student_id>", methods=["POST"])
-@login_required(["admin"])
+@login_required("admin")
 def delete_student(student_id):
-    conn = get_db()
-
-    student = conn.execute(
-        "SELECT email FROM students WHERE id=?",
-        (student_id,)
+    db = get_db()
+    student = db.execute(
+        "SELECT user_id FROM students WHERE id=?", (student_id,)
     ).fetchone()
 
-    if student:
-        conn.execute(
-            "DELETE FROM attendance WHERE student_id=?",
-            (student_id,)
-        )
-        conn.execute(
-            "DELETE FROM exams WHERE student_id=?",
-            (student_id,)
-        )
-        conn.execute(
-            "DELETE FROM fees WHERE student_id=?",
-            (student_id,)
-        )
-        conn.execute(
-            "DELETE FROM students WHERE id=?",
-            (student_id,)
-        )
-        conn.execute("""
-            DELETE FROM users
-            WHERE email=? AND role='student'
-        """, (student["email"],))
+    db.execute("DELETE FROM attendance WHERE student_id=?", (student_id,))
+    db.execute("DELETE FROM exams WHERE student_id=?", (student_id,))
+    db.execute("DELETE FROM fees WHERE student_id=?", (student_id,))
+    db.execute("DELETE FROM students WHERE id=?", (student_id,))
 
-        conn.commit()
-        flash("Student deleted successfully.")
+    if student and student["user_id"]:
+        db.execute("DELETE FROM users WHERE id=?", (student["user_id"],))
 
-    conn.close()
-
+    db.commit()
+    db.close()
+    flash("Student deleted.", "success")
     return redirect(url_for("students"))
 
 
-# ---------------- TEACHER MANAGEMENT ----------------
+# ADMIN: TEACHERS
 
-@app.route("/teachers")
-@login_required(["admin"])
+@app.route("/teachers", methods=["GET", "POST"])
+@login_required("admin")
 def teachers():
-    conn = get_db()
+    db = get_db()
 
-    records = conn.execute("""
-        SELECT * FROM teachers ORDER BY id DESC
-    """).fetchall()
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        subject = request.form.get("subject", "").strip()
+        password = request.form.get("password", "")
 
-    conn.close()
+        if not name or not email or len(password) < 6:
+            flash("Enter all details and a password of at least 6 characters.", "error")
+        else:
+            try:
+                cursor = db.execute(
+                    "INSERT INTO users(name,email,password,role) VALUES(?,?,?,?)",
+                    (name, email, generate_password_hash(password), "teacher")
+                )
+                db.execute(
+                    "INSERT INTO teachers(user_id,name,email,subject) VALUES(?,?,?,?)",
+                    (cursor.lastrowid, name, email, subject)
+                )
+                db.commit()
+                flash("Teacher added. They can now log in.", "success")
+            except sqlite3.IntegrityError:
+                flash("Email already exists.", "error")
 
+    records = db.execute("SELECT * FROM teachers ORDER BY id DESC").fetchall()
+    db.close()
     return render_template("teachers.html", teachers=records)
 
 
-@app.route("/teachers/add", methods=["POST"])
-@login_required(["admin"])
-def add_teacher():
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip().lower()
-    subject = request.form.get("subject", "")
-    password = request.form.get("password", "")
-
-    if not name or not email or len(password) < 6:
-        flash("Enter valid details and a password of at least 6 characters.")
-        return redirect(url_for("teachers"))
-
-    conn = get_db()
-
-    try:
-        conn.execute("""
-            INSERT INTO users (name, email, password, role)
-            VALUES (?, ?, ?, 'teacher')
-        """, (
-            name,
-            email,
-            generate_password_hash(password)
-        ))
-
-        conn.execute("""
-            INSERT INTO teachers (name, email, subject)
-            VALUES (?, ?, ?)
-        """, (name, email, subject))
-
-        conn.commit()
-        flash("Teacher account created successfully.")
-
-    except sqlite3.IntegrityError:
-        conn.rollback()
-        flash("This email is already registered.")
-
-    finally:
-        conn.close()
-
-    return redirect(url_for("teachers"))
-
-
 @app.route("/teachers/delete/<int:teacher_id>", methods=["POST"])
-@login_required(["admin"])
+@login_required("admin")
 def delete_teacher(teacher_id):
-    conn = get_db()
-
-    teacher = conn.execute(
-        "SELECT email FROM teachers WHERE id=?",
-        (teacher_id,)
+    db = get_db()
+    teacher = db.execute(
+        "SELECT user_id FROM teachers WHERE id=?", (teacher_id,)
     ).fetchone()
 
-    if teacher:
-        conn.execute(
-            "DELETE FROM teachers WHERE id=?",
-            (teacher_id,)
-        )
-        conn.execute("""
-            DELETE FROM users
-            WHERE email=? AND role='teacher'
-        """, (teacher["email"],))
+    db.execute("DELETE FROM teachers WHERE id=?", (teacher_id,))
+    if teacher and teacher["user_id"]:
+        db.execute("DELETE FROM users WHERE id=?", (teacher["user_id"],))
 
-        conn.commit()
-        flash("Teacher deleted successfully.")
-
-    conn.close()
-
+    db.commit()
+    db.close()
+    flash("Teacher deleted.", "success")
     return redirect(url_for("teachers"))
 
 
-# ---------------- ATTENDANCE ----------------
+# ATTENDANCE: ADMIN AND TEACHER
 
 @app.route("/attendance", methods=["GET", "POST"])
-@login_required(["admin", "teacher"])
+@login_required()
 def attendance():
-    conn = get_db()
+    if session["role"] not in ("admin", "teacher"):
+        return redirect(url_for("student_portal"))
+
+    db = get_db()
 
     if request.method == "POST":
-        student_id = request.form.get("student_id")
-        date = request.form.get("date")
-        status = request.form.get("status")
+        try:
+            student_id = int(request.form.get("student_id"))
+            date = request.form.get("date", "")
+            status = request.form.get("status", "")
 
-        student = conn.execute(
-            "SELECT id FROM students WHERE id=?",
-            (student_id,)
-        ).fetchone()
+            student = db.execute(
+                "SELECT id FROM students WHERE id=?", (student_id,)
+            ).fetchone()
 
-        if student and date and status in ("Present", "Absent"):
-            conn.execute("""
-                INSERT INTO attendance (student_id, date, status)
-                VALUES (?, ?, ?)
-            """, (student_id, date, status))
+            if not student or status not in ("Present", "Absent", "Late") or not date:
+                flash("Please enter valid attendance details.", "error")
+            else:
+                db.execute(
+                    """INSERT INTO attendance(student_id,date,status,marked_by)
+                    VALUES(?,?,?,?)""",
+                    (student_id, date, status, session["user_id"])
+                )
+                db.commit()
+                flash("Attendance saved.", "success")
+        except (ValueError, TypeError):
+            flash("Please select a valid student.", "error")
 
-            conn.commit()
-            flash("Attendance saved successfully.")
-        else:
-            flash("Please enter valid attendance details.")
+    student_list = db.execute("SELECT * FROM students ORDER BY name").fetchall()
+    records = db.execute(
+        """SELECT attendance.*, students.name AS student_name
+        FROM attendance JOIN students ON students.id=attendance.student_id
+        ORDER BY attendance.date DESC, attendance.id DESC"""
+    ).fetchall()
 
-    student_list = conn.execute("""
-        SELECT * FROM students ORDER BY name
-    """).fetchall()
-
-    records = conn.execute("""
-        SELECT attendance.*, students.name
-        FROM attendance
-        JOIN students ON students.id=attendance.student_id
-        ORDER BY attendance.date DESC, attendance.id DESC
-    """).fetchall()
-
-    conn.close()
-
+    db.close()
     return render_template(
-        "attendance.html",
-        students=student_list,
-        records=records
+        "attendance.html", students=student_list, records=records
     )
 
 
-# ---------------- EXAMINATIONS ----------------
+# EXAMS: ADMIN AND TEACHER
 
 @app.route("/exams", methods=["GET", "POST"])
-@login_required(["admin", "teacher"])
+@login_required()
 def exams():
-    conn = get_db()
+    if session["role"] not in ("admin", "teacher"):
+        return redirect(url_for("student_portal"))
+
+    db = get_db()
 
     if request.method == "POST":
-        student_id = request.form.get("student_id")
-        subject = request.form.get("subject", "").strip()
-
         try:
-            marks = int(request.form.get("marks", ""))
-            total = int(request.form.get("total", ""))
+            student_id = int(request.form.get("student_id"))
+            subject = request.form.get("subject", "").strip()
+            marks = float(request.form.get("marks"))
+            total = float(request.form.get("total"))
+            exam_date = request.form.get("exam_date", "")
 
-            student = conn.execute(
-                "SELECT id FROM students WHERE id=?",
-                (student_id,)
-            ).fetchone()
-
-            if not student or not subject or total <= 0 or marks < 0 or marks > total:
-                raise ValueError
-
-            conn.execute("""
-                INSERT INTO exams (student_id, subject, marks, total)
-                VALUES (?, ?, ?, ?)
-            """, (student_id, subject, marks, total))
-
-            conn.commit()
-            flash("Examination marks saved successfully.")
-
+            if (
+                not subject or total <= 0 or marks < 0
+                or marks > total
+                or not db.execute(
+                    "SELECT id FROM students WHERE id=?", (student_id,)
+                ).fetchone()
+            ):
+                flash("Please enter valid exam details.", "error")
+            else:
+                db.execute(
+                    """INSERT INTO exams(student_id,subject,marks,total,exam_date)
+                    VALUES(?,?,?,?,?)""",
+                    (student_id, subject, marks, total, exam_date)
+                )
+                db.commit()
+                flash("Exam result saved.", "success")
         except (ValueError, TypeError):
-            flash("Please enter valid examination details.")
+            flash("Please enter valid marks and select a student.", "error")
 
-    student_list = conn.execute("""
-        SELECT * FROM students ORDER BY name
-    """).fetchall()
+    student_list = db.execute("SELECT * FROM students ORDER BY name").fetchall()
+    records = db.execute(
+        """SELECT exams.*, students.name AS student_name
+        FROM exams JOIN students ON students.id=exams.student_id
+        ORDER BY exams.id DESC"""
+    ).fetchall()
 
-    records = conn.execute("""
-        SELECT exams.*, students.name
-        FROM exams
-        JOIN students ON students.id=exams.student_id
-        ORDER BY exams.id DESC
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "exams.html",
-        students=student_list,
-        records=records
-    )
+    db.close()
+    return render_template("exams.html", students=student_list, records=records)
 
 
-# ---------------- FEE MANAGEMENT ----------------
+# FEES: ADMIN
 
 @app.route("/fees", methods=["GET", "POST"])
-@login_required(["admin"])
+@login_required("admin")
 def fees():
-    conn = get_db()
+    db = get_db()
 
     if request.method == "POST":
-        student_id = request.form.get("student_id")
-        status = request.form.get("status")
-
         try:
-            amount = float(request.form.get("amount", ""))
+            student_id = int(request.form.get("student_id"))
+            amount = float(request.form.get("amount"))
+            status = request.form.get("status", "")
+            due_date = request.form.get("due_date", "")
 
-            student = conn.execute(
-                "SELECT id FROM students WHERE id=?",
-                (student_id,)
-            ).fetchone()
-
-            if not student or amount < 0 or status not in ("Paid", "Pending"):
-                raise ValueError
-
-            conn.execute("""
-                INSERT INTO fees (student_id, amount, status)
-                VALUES (?, ?, ?)
-            """, (student_id, amount, status))
-
-            conn.commit()
-            flash("Fee record saved successfully.")
-
+            if (
+                amount < 0 or status not in ("Paid", "Pending")
+                or not db.execute(
+                    "SELECT id FROM students WHERE id=?", (student_id,)
+                ).fetchone()
+            ):
+                flash("Please enter valid fee details.", "error")
+            else:
+                db.execute(
+                    """INSERT INTO fees(student_id,amount,status,due_date)
+                    VALUES(?,?,?,?)""",
+                    (student_id, amount, status, due_date)
+                )
+                db.commit()
+                flash("Fee record saved.", "success")
         except (ValueError, TypeError):
-            flash("Please enter valid fee details.")
+            flash("Please enter a valid amount and student.", "error")
 
-    student_list = conn.execute("""
-        SELECT * FROM students ORDER BY name
-    """).fetchall()
+    student_list = db.execute("SELECT * FROM students ORDER BY name").fetchall()
+    records = db.execute(
+        """SELECT fees.*, students.name AS student_name
+        FROM fees JOIN students ON students.id=fees.student_id
+        ORDER BY fees.id DESC"""
+    ).fetchall()
 
-    records = conn.execute("""
-        SELECT fees.*, students.name
-        FROM fees
-        JOIN students ON students.id=fees.student_id
-        ORDER BY fees.id DESC
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "fees.html",
-        students=student_list,
-        records=records
-    )
+    db.close()
+    return render_template("fees.html", students=student_list, records=records)
 
 
-# ---------------- ACADEMIC REPORTS ----------------
+# REPORTS: ADMIN AND TEACHER
 
 @app.route("/reports")
-@login_required(["admin", "teacher"])
+@login_required()
 def reports():
-    conn = get_db()
+    if session["role"] not in ("admin", "teacher"):
+        return redirect(url_for("student_portal"))
 
-    attendance_report = conn.execute("""
-        SELECT
-            students.name,
-            COUNT(attendance.id) AS total_days,
-            SUM(
-                CASE WHEN attendance.status='Present'
-                THEN 1 ELSE 0 END
-            ) AS present_days
-        FROM students
-        LEFT JOIN attendance
-        ON students.id=attendance.student_id
-        GROUP BY students.id
-    """).fetchall()
+    db = get_db()
+    attendance_count = db.execute(
+        "SELECT COUNT(*) FROM attendance"
+    ).fetchone()[0]
+    exam_count = db.execute(
+        "SELECT COUNT(*) FROM exams"
+    ).fetchone()[0]
+    fee_count = db.execute(
+        "SELECT COUNT(*) FROM fees"
+    ).fetchone()[0]
 
-    exam_report = conn.execute("""
-        SELECT
-            students.name,
-            exams.subject,
-            exams.marks,
-            exams.total
-        FROM exams
-        JOIN students ON students.id=exams.student_id
-        ORDER BY students.name
-    """).fetchall()
-
-    conn.close()
-
+    db.close()
     return render_template(
         "reports.html",
-        attendance_report=attendance_report,
-        exam_report=exam_report
+        attendance_count=attendance_count,
+        exam_count=exam_count,
+        fee_count=fee_count
     )
 
 
-# ---------------- STUDENT DASHBOARD ----------------
+# STUDENT PORTAL
 
 @app.route("/student")
-@login_required(["student"])
+@login_required("student")
 def student_portal():
-    conn = get_db()
-
-    student = conn.execute(
-        "SELECT * FROM students WHERE email=?",
-        (session["email"],)
+    db = get_db()
+    student = db.execute(
+        "SELECT * FROM students WHERE user_id=?",
+        (session["user_id"],)
     ).fetchone()
 
-    attendance_records = []
-    exam_records = []
-    fee_records = []
+    if not student:
+        db.close()
+        flash("Student profile not found. Contact the administrator.", "error")
+        return redirect(url_for("logout"))
 
-    if student:
-        attendance_records = conn.execute("""
-            SELECT * FROM attendance
-            WHERE student_id=?
-            ORDER BY date DESC
-        """, (student["id"],)).fetchall()
+    attendance_records = db.execute(
+        "SELECT * FROM attendance WHERE student_id=? ORDER BY date DESC",
+        (student["id"],)
+    ).fetchall()
 
-        exam_records = conn.execute("""
-            SELECT * FROM exams
-            WHERE student_id=?
-            ORDER BY id DESC
-        """, (student["id"],)).fetchall()
+    exam_records = db.execute(
+        "SELECT * FROM exams WHERE student_id=? ORDER BY id DESC",
+        (student["id"],)
+    ).fetchall()
 
-        fee_records = conn.execute("""
-            SELECT * FROM fees
-            WHERE student_id=?
-            ORDER BY id DESC
-        """, (student["id"],)).fetchall()
+    fee_records = db.execute(
+        "SELECT * FROM fees WHERE student_id=? ORDER BY id DESC",
+        (student["id"],)
+    ).fetchall()
 
-    conn.close()
-
+    db.close()
     return render_template(
         "student_portal.html",
         student=student,
@@ -771,15 +575,45 @@ def student_portal():
     )
 
 
-# ---------------- TEACHER DASHBOARD ----------------
+# TEACHER PORTAL
 
 @app.route("/teacher")
-@login_required(["teacher"])
+@login_required("teacher")
 def teacher_portal():
-    return render_template("teacher_portal.html")
+    db = get_db()
+    teacher = db.execute(
+        "SELECT * FROM teachers WHERE user_id=?",
+        (session["user_id"],)
+    ).fetchone()
+
+    student_count = db.execute(
+        "SELECT COUNT(*) FROM students"
+    ).fetchone()[0]
+
+    attendance_count = db.execute(
+        "SELECT COUNT(*) FROM attendance WHERE marked_by=?",
+        (session["user_id"],)
+    ).fetchone()[0]
+
+    exam_count = db.execute(
+        "SELECT COUNT(*) FROM exams"
+    ).fetchone()[0]
+
+    db.close()
+
+    return render_template(
+        "teacher_portal.html",
+        teacher=teacher,
+        student_count=student_count,
+        attendance_count=attendance_count,
+        exam_count=exam_count
+    )
 
 
-# ---------------- RUN APPLICATION ----------------
+@app.errorhandler(404)
+def not_found(error):
+    return "Page not found. Please return to the dashboard.", 404
+
 
 if __name__ == "__main__":
     init_db()

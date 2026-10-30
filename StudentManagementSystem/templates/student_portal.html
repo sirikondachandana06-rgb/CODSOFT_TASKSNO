@@ -1,122 +1,95 @@
 
 {% extends "base.html" %}
-{% block title %}Student Dashboard | EduManage{% endblock %}
+
+{% block title %}Student Dashboard{% endblock %}
 
 {% block content %}
+
 <div class="page-heading">
-    <div>
-        <h1>My Student Dashboard</h1>
-        <p>Welcome, {{ session.get('name') }}!</p>
-    </div>
+    <h1>Student Dashboard</h1>
+    <p>Welcome, {{ student.name }}!</p>
+    <p>View your academic information below.</p>
 </div>
 
-<div class="content-card">
+<div class="info-card">
     <h2>My Profile</h2>
-
-    {% if student %}
-    <div class="profile-grid">
-        <div><strong>Name</strong><span>{{ student.name }}</span></div>
-        <div><strong>Email</strong><span>{{ student.email }}</span></div>
-        <div><strong>Course</strong><span>{{ student.course or 'Not updated' }}</span></div>
-        <div><strong>Academic Year</strong><span>{{ student.year or 'Not updated' }}</span></div>
-        <div><strong>Phone</strong><span>{{ student.phone or 'Not updated' }}</span></div>
-        <div><strong>Student ID</strong><span>{{ student.id }}</span></div>
-    </div>
-    {% else %}
-    <p class="empty-message">Your student profile is not available. Please contact the administrator.</p>
-    {% endif %}
+    <p><strong>Name:</strong> {{ student.name }}</p>
+    <p><strong>Email:</strong> {{ student.email }}</p>
+    <p><strong>Course:</strong> {{ student.course or 'Not specified' }}</p>
+    <p><strong>Year:</strong> {{ student.year or 'Not specified' }}</p>
 </div>
 
-<div class="content-card">
-    <h2>My Attendance</h2>
+<h2>My Attendance</h2>
 
-    {% if attendance %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for record in attendance %}
-                <tr>
-                    <td>{{ record.date }}</td>
-                    <td>
-                        <span class="status {{ 'present' if record.status == 'Present' else 'absent' }}">
-                            {{ record.status }}
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="empty-message">No attendance records available.</p>
-    {% endif %}
+<div class="table-container">
+    <table>
+        <tr>
+            <th>Date</th>
+            <th>Status</th>
+        </tr>
+
+        {% for record in attendance %}
+        <tr>
+            <td>{{ record.date }}</td>
+            <td>{{ record.status }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2">No attendance records available.</td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
 
-<div class="content-card">
-    <h2>My Examination Results</h2>
+<h2>My Examination Results</h2>
 
-    {% if exams %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Subject</th>
-                    <th>Marks</th>
-                    <th>Total</th>
-                    <th>Percentage</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for exam in exams %}
-                <tr>
-                    <td>{{ exam.subject }}</td>
-                    <td>{{ exam.marks }}</td>
-                    <td>{{ exam.total }}</td>
-                    <td>{{ "%.2f"|format(exam.marks / exam.total * 100) }}%</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="empty-message">No examination results available.</p>
-    {% endif %}
+<div class="table-container">
+    <table>
+        <tr>
+            <th>Subject</th>
+            <th>Marks</th>
+            <th>Total</th>
+            <th>Date</th>
+        </tr>
+
+        {% for exam in exams %}
+        <tr>
+            <td>{{ exam.subject }}</td>
+            <td>{{ exam.marks }}</td>
+            <td>{{ exam.total }}</td>
+            <td>{{ exam.exam_date }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4">No examination results available.</td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
 
-<div class="content-card">
-    <h2>My Fee Details</h2>
+<h2>My Fee Details</h2>
 
-    {% if fees %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Amount</th>
-                    <th>Payment Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for fee in fees %}
-                <tr>
-                    <td>₹{{ "%.2f"|format(fee.amount) }}</td>
-                    <td>
-                        <span class="status {{ 'present' if fee.status == 'Paid' else 'absent' }}">
-                            {{ fee.status }}
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="empty-message">No fee records available.</p>
-    {% endif %}
+<div class="table-container">
+    <table>
+        <tr>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Due Date</th>
+        </tr>
+
+        {% for fee in fees %}
+        <tr>
+            <td>₹{{ fee.amount }}</td>
+            <td>{{ fee.status }}</td>
+            <td>{{ fee.due_date }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="3">No fee records available.</td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
+
 {% endblock %}
+

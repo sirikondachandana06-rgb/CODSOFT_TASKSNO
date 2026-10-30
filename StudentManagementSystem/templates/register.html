@@ -1,26 +1,15 @@
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register | Student Management System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body class="auth-page">
+{% extends "base.html" %}
+
+{% block title %}Register | Student Management System{% endblock %}
+
+{% block content %}
+<div class="auth-container">
     <div class="auth-card">
         <h1>Create Account</h1>
-        <p class="subtitle">Join our Student Management System</p>
+        <p>Register as a student or teacher.</p>
 
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <form method="POST">
+        <form method="POST" action="{{ url_for('register') }}">
             <label>Full Name</label>
             <input type="text" name="name" placeholder="Enter your full name" required>
 
@@ -28,16 +17,16 @@
             <input type="email" name="email" placeholder="Enter your email" required>
 
             <label>Password</label>
-            <input type="password" name="password" placeholder="Create a password" minlength="6" required>
+            <input type="password" name="password" placeholder="Minimum 6 characters" minlength="6" required>
 
-            <label>Register As</label>
+            <label>Select Role</label>
             <select name="role" required>
-                <option value="">Select Account Type</option>
+                <option value="">Choose your role</option>
                 <option value="student">Student</option>
                 <option value="teacher">Teacher</option>
             </select>
 
-            <button type="submit" class="primary-btn">Create Account</button>
+            <button type="submit" class="btn">Register</button>
         </form>
 
         <p class="auth-link">
@@ -45,5 +34,6 @@
             <a href="{{ url_for('login') }}">Login here</a>
         </p>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
+

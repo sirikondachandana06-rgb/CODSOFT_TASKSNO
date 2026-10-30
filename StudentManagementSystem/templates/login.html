@@ -1,33 +1,22 @@
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Student Management System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body class="auth-page">
+{% extends "base.html" %}
+
+{% block title %}Login | Student Management System{% endblock %}
+
+{% block content %}
+<div class="auth-container">
     <div class="auth-card">
-        <h1>Welcome Back</h1>
-        <p class="subtitle">Student Management System</p>
+        <h1>Welcome Back!</h1>
+        <p>Login to your Student Management System account.</p>
 
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <form method="POST">
+        <form method="POST" action="{{ url_for('login') }}">
             <label>Email Address</label>
             <input type="email" name="email" placeholder="Enter your email" required>
 
             <label>Password</label>
             <input type="password" name="password" placeholder="Enter your password" required>
 
-            <button type="submit" class="primary-btn">Login</button>
+            <button type="submit" class="btn">Login</button>
         </form>
 
         <p class="auth-link">
@@ -35,11 +24,11 @@
             <a href="{{ url_for('register') }}">Register here</a>
         </p>
 
-        <p class="demo-login">
-            Admin demo login<br>
-            Email: admin@school.com<br>
-            Password: admin123
-        </p>
+        <div class="demo-login">
+            <strong>Admin Demo Login</strong>
+            <p>Email: admin@school.com</p>
+            <p>Password: admin123</p>
+        </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

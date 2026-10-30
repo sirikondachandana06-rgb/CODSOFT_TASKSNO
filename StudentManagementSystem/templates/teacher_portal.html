@@ -1,0 +1,65 @@
+
+{% extends "base.html" %}
+
+{% block title %}Teacher Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="page-heading">
+    <h1>Teacher Dashboard</h1>
+    <p>Welcome, {{ session.get('name') }}!</p>
+    <p>Manage your students, attendance and examination records.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Students</h3>
+        <h2>{{ student_count }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <h3>Attendance Marked</h3>
+        <h2>{{ attendance_count }}</h2>
+    </div>
+
+    <div class="stat-card">
+        <h3>Exam Records</h3>
+        <h2>{{ exam_count }}</h2>
+    </div>
+</div>
+
+<h2>Teacher Activities</h2>
+
+<div class="management-grid">
+
+    <a class="management-card" href="{{ url_for('attendance') }}">
+        <h3>Mark Attendance</h3>
+        <p>Record daily student attendance.</p>
+    </a>
+
+    <a class="management-card" href="{{ url_for('exams') }}">
+        <h3>Manage Examinations</h3>
+        <p>Enter and view student examination marks.</p>
+    </a>
+
+    <a class="management-card" href="{{ url_for('reports') }}">
+        <h3>View Reports</h3>
+        <p>View attendance and examination summaries.</p>
+    </a>
+
+</div>
+
+<div class="info-card">
+    <h2>Teacher Information</h2>
+
+    {% if teacher %}
+        <p><strong>Name:</strong> {{ teacher.name }}</p>
+        <p><strong>Email:</strong> {{ teacher.email }}</p>
+        <p><strong>Subject:</strong> {{ teacher.subject or 'Not specified' }}</p>
+    {% else %}
+        <p>Your teacher profile information is not available.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
+

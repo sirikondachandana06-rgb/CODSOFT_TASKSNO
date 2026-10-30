@@ -1,81 +1,71 @@
 
 {% extends "base.html" %}
-{% block title %}Fee Management | EduManage{% endblock %}
+
+{% block title %}Fee Management{% endblock %}
 
 {% block content %}
+
 <div class="page-heading">
-    <div>
-        <h1>Fee Management</h1>
-        <p>Track student fee payments and pending balances.</p>
-    </div>
+    <h1>Fee Management</h1>
+    <p>Manage student fee details and payment status.</p>
 </div>
 
-<div class="content-card">
+<div class="form-card">
     <h2>Add Fee Record</h2>
 
-    <form method="POST" class="form-grid">
-        <div>
-            <label>Select Student</label>
-            <select name="student_id" required>
-                <option value="">Choose a student</option>
-                {% for student in students %}
-                <option value="{{ student.id }}">{{ student.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+    <form method="POST">
+        <label>Select Student</label>
+        <select name="student_id" required>
+            <option value="">Choose Student</option>
+            {% for student in students %}
+            <option value="{{ student.id }}">
+                {{ student.name }} - {{ student.email }}
+            </option>
+            {% endfor %}
+        </select>
 
-        <div>
-            <label>Fee Amount (₹)</label>
-            <input type="number" name="amount" min="0" step="0.01" placeholder="Enter amount" required>
-        </div>
+        <label>Fee Amount (₹)</label>
+        <input type="number" name="amount" min="0" step="0.01" placeholder="Enter fee amount" required>
 
-        <div>
-            <label>Payment Status</label>
-            <select name="status" required>
-                <option value="">Select status</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-            </select>
-        </div>
+        <label>Payment Status</label>
+        <select name="status" required>
+            <option value="">Choose Status</option>
+            <option value="Paid">Paid</option>
+            <option value="Pending">Pending</option>
+        </select>
 
-        <div class="form-action">
-            <button type="submit" class="primary-btn">Save Fee Record</button>
-        </div>
+        <label>Due Date</label>
+        <input type="date" name="due_date">
+
+        <button type="submit" class="btn">Save Fee Record</button>
     </form>
 </div>
 
-<div class="content-card">
-    <h2>Fee Records</h2>
+<h2>Student Fee Records</h2>
 
-    {% if records %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th>Amount</th>
-                    <th>Payment Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for record in records %}
-                <tr>
-                    <td>{{ record.name }}</td>
-                    <td>₹{{ "%.2f"|format(record.amount) }}</td>
-                    <td>
-                        {% if record.status == 'Paid' %}
-                        <span class="status present">Paid</span>
-                        {% else %}
-                        <span class="status absent">Pending</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="empty-message">No fee records available yet.</p>
-    {% endif %}
+<div class="table-container">
+    <table>
+        <tr>
+            <th>Student Name</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Due Date</th>
+        </tr>
+
+        {% for fee in records %}
+        <tr>
+            <td>{{ fee.student_name }}</td>
+            <td>₹{{ fee.amount }}</td>
+            <td>{{ fee.status }}</td>
+            <td>{{ fee.due_date or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4">No fee records available.</td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
+
 {% endblock %}
+

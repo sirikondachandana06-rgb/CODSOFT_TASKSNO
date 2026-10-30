@@ -1,82 +1,67 @@
-{
+
 {% extends "base.html" %}
-{% block title %}Attendance | EduManage{% endblock %}
+
+{% block title %}Attendance Management{% endblock %}
 
 {% block content %}
+
 <div class="page-heading">
-    <div>
-        <h1>Attendance Management</h1>
-        <p>Record and monitor student attendance.</p>
-    </div>
+    <h1>Attendance Management</h1>
+    <p>Record and view student attendance.</p>
 </div>
 
-<div class="content-card">
+<div class="form-card">
     <h2>Mark Attendance</h2>
 
-    <form method="POST" class="form-grid">
-        <div>
-            <label>Select Student</label>
-            <select name="student_id" required>
-                <option value="">Choose a student</option>
-                {% for student in students %}
-                <option value="{{ student.id }}">{{ student.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+    <form method="POST">
+        <label>Select Student</label>
+        <select name="student_id" required>
+            <option value="">Choose Student</option>
+            {% for student in students %}
+            <option value="{{ student.id }}">
+                {{ student.name }} - {{ student.email }}
+            </option>
+            {% endfor %}
+        </select>
 
-        <div>
-            <label>Date</label>
-            <input type="date" name="date" required>
-        </div>
+        <label>Date</label>
+        <input type="date" name="date" required>
 
-        <div>
-            <label>Attendance Status</label>
-            <select name="status" required>
-                <option value="">Select status</option>
-                <option value="Present">Present</option>
-                <option value="Absent">Absent</option>
-            </select>
-        </div>
+        <label>Attendance Status</label>
+        <select name="status" required>
+            <option value="">Choose Status</option>
+            <option value="Present">Present</option>
+            <option value="Absent">Absent</option>
+            <option value="Late">Late</option>
+        </select>
 
-        <div class="form-action">
-            <button type="submit" class="primary-btn">Save Attendance</button>
-        </div>
+        <button type="submit" class="btn">Save Attendance</button>
     </form>
 </div>
 
-<div class="content-card">
-    <h2>Attendance Records</h2>
+<h2>Attendance Records</h2>
 
-    {% if records %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Student Name</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
+<div class="table-container">
+    <table>
+        <tr>
+            <th>Student Name</th>
+            <th>Date</th>
+            <th>Status</th>
+        </tr>
 
-            <tbody>
-                {% for record in records %}
-                <tr>
-                    <td>{{ record.name }}</td>
-                    <td>{{ record.date }}</td>
-                    <td>
-                        {% if record.status == 'Present' %}
-                        <span class="status present">Present</span>
-                        {% else %}
-                        <span class="status absent">Absent</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="empty-message">No attendance records available yet.</p>
-    {% endif %}
+        {% for record in records %}
+        <tr>
+            <td>{{ record.student_name }}</td>
+            <td>{{ record.date }}</td>
+            <td>{{ record.status }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="3">No attendance records available.</td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
+
 {% endblock %}
+
