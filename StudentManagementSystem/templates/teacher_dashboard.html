@@ -1,0 +1,55 @@
+
+{% extends "base.html" %}
+{% block title %}Teacher Dashboard | EduManage{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Teacher Dashboard</h1>
+        <p>Welcome, {{ session.get('name') }}!</p>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <span>Student Records</span>
+        <h2>Manage</h2>
+        <p>View students while recording academic progress.</p>
+    </div>
+
+    <div class="stat-card">
+        <span>Attendance</span>
+        <h2>Track</h2>
+        <p>Record and monitor student attendance.</p>
+    </div>
+
+    <div class="stat-card">
+        <span>Examinations</span>
+        <h2>Results</h2>
+        <p>Enter and review examination marks.</p>
+    </div>
+</div>
+
+<div class="content-card">
+    <h2>Quick Actions</h2>
+    <div class="quick-actions">
+        <a href="{{ url_for('attendance') }}" class="action-card">
+            <span class="action-icon">📅</span>
+            <strong>Manage Attendance</strong>
+            <p>Mark student attendance.</p>
+        </a>
+
+        <a href="{{ url_for('exams') }}" class="action-card">
+            <span class="action-icon">📝</span>
+            <strong>Manage Examinations</strong>
+            <p>Enter examination marks.</p>
+        </a>
+
+        <a href="{{ url_for('reports') }}" class="action-card">
+            <span class="action-icon">📊</span>
+            <strong>Academic Reports</strong>
+            <p>Review student performance.</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

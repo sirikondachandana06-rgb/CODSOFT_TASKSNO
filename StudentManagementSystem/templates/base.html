@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student Management System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="app-page">
+
+    <header class="topbar">
+        <a href="{{ url_for('dashboard') }}" class="brand">
+            <span class="brand-icon">S</span>
+            <span>EduManage</span>
+        </a>
+
+        <div class="topbar-right">
+            <span>{{ session.get('name', 'User') }}</span>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <p class="menu-label">MAIN MENU</p>
+
+            {% if session.get('role') == 'admin' %}
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('students') }}">Students</a>
+                <a href="{{ url_for('teachers') }}">Teachers</a>
+                <a href="{{ url_for('attendance') }}">Attendance</a>
+                <a href="{{ url_for('exams') }}">Examinations</a>
+                <a href="{{ url_for('fees') }}">Fee Management</a>
+                <a href="{{ url_for('reports') }}">Reports</a>
+
+            {% elif session.get('role') == 'teacher' %}
+                <a href="{{ url_for('teacher_portal') }}">Dashboard</a>
+                <a href="{{ url_for('attendance') }}">Attendance</a>
+                <a href="{{ url_for('exams') }}">Examinations</a>
+                <a href="{{ url_for('reports') }}">Reports</a>
+
+            {% elif session.get('role') == 'student' %}
+                <a href="{{ url_for('student_portal') }}">My Dashboard</a>
+            {% endif %}
+        </aside>
+
+        <main class="main-content">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+</body>
+</html>

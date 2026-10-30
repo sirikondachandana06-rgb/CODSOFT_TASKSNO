@@ -1,0 +1,82 @@
+
+{% extends "base.html" %}
+{% block title %}Academic Reports | EduManage{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Academic Reports</h1>
+        <p>Review student attendance and examination performance.</p>
+    </div>
+</div>
+
+<div class="content-card">
+    <h2>Attendance Summary</h2>
+
+    {% if attendance_report %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Total Attendance Records</th>
+                    <th>Present Days</th>
+                    <th>Attendance Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in attendance_report %}
+                <tr>
+                    <td>{{ record.name }}</td>
+                    <td>{{ record.total_days }}</td>
+                    <td>{{ record.present_days or 0 }}</td>
+                    <td>
+                        {% if record.total_days %}
+                            {{ "%.1f"|format((record.present_days or 0) / record.total_days * 100) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-message">No attendance data available.</p>
+    {% endif %}
+</div>
+
+<div class="content-card">
+    <h2>Examination Performance</h2>
+
+    {% if exam_report %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Subject</th>
+                    <th>Marks Obtained</th>
+                    <th>Total Marks</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in exam_report %}
+                <tr>
+                    <td>{{ record.name }}</td>
+                    <td>{{ record.subject }}</td>
+                    <td>{{ record.marks }}</td>
+                    <td>{{ record.total }}</td>
+                    <td>{{ "%.2f"|format(record.marks / record.total * 100) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-message">No examination data available.</p>
+    {% endif %}
+</div>
+{% endblock %}

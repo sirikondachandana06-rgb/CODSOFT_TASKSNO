@@ -1,0 +1,64 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Admin Dashboard</h1>
+        <p>Welcome, {{ session.get('name') }}! Here's your overview.</p>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <span>Total Students</span>
+        <h2>{{ counts.students }}</h2>
+    </div>
+    <div class="stat-card">
+        <span>Total Teachers</span>
+        <h2>{{ counts.teachers }}</h2>
+    </div>
+    <div class="stat-card">
+        <span>Attendance Records</span>
+        <h2>{{ counts.attendance }}</h2>
+    </div>
+    <div class="stat-card">
+        <span>Fee Records</span>
+        <h2>{{ counts.fees }}</h2>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="section-heading">
+        <h2>Recently Added Students</h2>
+        <a href="{{ url_for('students') }}" class="small-btn">View All</a>
+    </div>
+
+    {% if students %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Course</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.id }}</td>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.email }}</td>
+                    <td>{{ student.course or 'Not added' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-message">No students registered yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
